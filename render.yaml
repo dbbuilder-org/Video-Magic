@@ -3,6 +3,7 @@ services:
   - type: web
     name: video-magic-api
     runtime: python
+    pythonVersion: "3.12"
     region: oregon
     plan: starter             # 512 MB RAM — Veo polling is pure I/O; ffmpeg peaks ~250 MB
                               # Upgrade to standard ($25) only if ffmpeg OOMs on 60s videos
