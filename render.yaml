@@ -56,17 +56,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: BACKEND_URL
-        fromService:
-          type: web
-          name: video-magic-api
-          property: host
-          transform: "https://{{value}}"
+        sync: false           # set in Render dashboard to https://<video-magic-api>.onrender.com
       - key: NEXT_PUBLIC_BACKEND_URL
-        fromService:
-          type: web
-          name: video-magic-api
-          property: host
-          transform: "https://{{value}}"
+        sync: false           # same value as BACKEND_URL
       - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
         sync: false
       - key: CLERK_SECRET_KEY
