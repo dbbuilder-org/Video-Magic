@@ -1,6 +1,18 @@
 # Roadmap — Video Magic
 
-**Last updated:** 2026-03-01
+**Last updated:** 2026-03-01 (rev 2)
+
+---
+
+## v1.1 — Auth + Social (shipped 2026-03-01)
+
+- [x] Clerk auth — sign-in / sign-up pages with branded appearance
+- [x] Middleware route protection (`/create`, `/project/:id`)
+- [x] User brand profile — saved across projects, pre-filled in wizard
+- [x] Referral system — unique codes, $5 credit on first referred purchase
+- [x] Credit display + auto-apply at Stripe checkout (dynamic Stripe coupon)
+- [x] Ownership enforcement on all project API routes (`X-User-Id` header)
+- [x] `UserButton` in nav on landing + create + project pages
 
 ---
 
@@ -20,6 +32,34 @@
 - [x] FastAPI backend + Next.js 16 frontend
 - [x] Render deployment config (`render.yaml`)
 - [x] Cloudflare DNS: `videomagic.servicevision.io`
+
+---
+
+## Sprint 0 — Cost Tracking (CRITICAL — do before first real user)
+
+**Every video generation call costs real money. We must track and alert on costs.**
+
+### What to build
+- [ ] **`api_costs` table** — log every external API call: `(project_id, provider, model, units, unit_type, cost_usd, created_at)`. Units = tokens for Gemini, seconds for Veo, characters for ElevenLabs.
+- [ ] **Cost constants** — define in `backend/costs.py`:
+  - Gemini Flash 2.0: input $0.075/1M tokens, output $0.30/1M tokens
+  - Imagen 4: $0.04 per image
+  - Veo 3.1: pricing TBD (check Google AI pricing page before launch)
+  - ElevenLabs turbo v2.5: $0.0005/character
+- [ ] **`pipeline/cost_logger.py`** — call `log_cost(project_id, provider, model, units, unit_type)` after each API call; auto-converts to USD using constants
+- [ ] **`GET /projects/{id}/cost-breakdown`** — returns itemized + total cost per project
+- [ ] **`GET /admin/costs`** — total costs by day/week, cost per video by duration, gross margin (price_charged - api_costs)
+- [ ] **Margin alert** — if `api_cost > price_charged * 0.6`, emit a warning log. A 60s video must not cost more than $12 in API calls on a $19.99 sale.
+- [ ] **Render env var** `COST_ALERT_EMAIL` — send email when margin < 40% (use Resend)
+
+### Estimated API cost per video (current pricing)
+| Duration | Gemini Flash | Imagen 4 | Veo 3.1 | ElevenLabs | ffmpeg | **Total est.** |
+|----------|-------------|----------|---------|-----------|-------|---------------|
+| 10s | ~$0.02 | $0.04 | ~$1.00 | ~$0.05 | $0 | **~$1.11** |
+| 30s | ~$0.03 | $0.04 | ~$3.00 | ~$0.10 | $0 | **~$3.17** |
+| 60s | ~$0.04 | $0.04 | ~$6.00 | ~$0.18 | $0 | **~$6.26** |
+
+**Gross margins: 10s ≈ 88%, 30s ≈ 79%, 60s ≈ 68%.** Monitor closely — Veo pricing is not yet published; these are estimates.
 
 ---
 

@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from models import create_tables
 from api.projects import router as projects_router
 from api.stripe_routes import router as stripe_router
+from api.users import router as users_router
 
 app = FastAPI(title="Video Magic API", version="1.0.0")
 
@@ -28,6 +29,7 @@ app.add_middleware(
 # Routers
 app.include_router(projects_router)
 app.include_router(stripe_router)
+app.include_router(users_router)
 
 # Serve generated videos as static files
 STORAGE_DIR = Path(os.environ.get("STORAGE_DIR", "./storage/projects"))

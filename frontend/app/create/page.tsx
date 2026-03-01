@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useUser, UserButton } from "@clerk/nextjs";
 import WizardUpload from "@/components/WizardUpload";
 import WizardBrand from "@/components/WizardBrand";
 import WizardDuration from "@/components/WizardDuration";
+import ReferralWidget from "@/components/ReferralWidget";
 
 interface WizardState {
   documentText: string;
@@ -17,16 +19,38 @@ function CreatePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const defaultDuration = Number(searchParams.get("duration") || "30");
+  const { user } = useUser();
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [state, setState] = useState<WizardState>({
     documentText: "",
     brandName: "",
     brandColor: "#1A56DB",
     duration: defaultDuration,
   });
+
+  // Load saved brand profile
+  useEffect(() => {
+    if (!user?.id || profileLoaded) return;
+    fetch(`/api/backend/users/${user.id}/profile`, {
+      headers: { "X-User-Id": user.id },
+    })
+      .then((r) => r.json())
+      .then((profile) => {
+        if (profile.brand_name) {
+          setState((s) => ({
+            ...s,
+            brandName: profile.brand_name,
+            brandColor: profile.brand_color || s.brandColor,
+          }));
+        }
+        setProfileLoaded(true);
+      })
+      .catch(() => setProfileLoaded(true));
+  }, [user?.id, profileLoaded]);
 
   const steps = ["Upload Content", "Brand Settings", "Duration & Pay"];
 
@@ -61,7 +85,18 @@ function CreatePageInner() {
         <a href="/" className="text-xl font-bold text-white">
           <span className="text-brand-cyan">Video</span>Magic
         </a>
-        <span className="text-slate-400 text-sm">Step {step} of 3</span>
+        <div className="flex items-center gap-4">
+          <span className="text-slate-400 text-sm">Step {step} of 3</span>
+          <UserButton
+            appearance={{
+              elements: {
+                avatarBox: "w-8 h-8",
+                userButtonPopoverCard: "bg-slate-900 border border-white/15",
+                userButtonPopoverActionButton: "text-slate-300 hover:text-white hover:bg-white/10",
+              },
+            }}
+          />
+        </div>
       </nav>
 
       <div className="max-w-2xl mx-auto px-8 py-16">
@@ -101,14 +136,19 @@ function CreatePageInner() {
           />
         )}
         {step === 3 && (
-          <WizardDuration
-            duration={state.duration}
-            onChange={(d) => setState((s) => ({ ...s, duration: d }))}
-            onBack={() => setStep(2)}
-            onCheckout={handleCheckout}
-            loading={loading}
-            error={error}
-          />
+          <>
+            <WizardDuration
+              duration={state.duration}
+              onChange={(d) => setState((s) => ({ ...s, duration: d }))}
+              onBack={() => setStep(2)}
+              onCheckout={handleCheckout}
+              loading={loading}
+              error={error}
+            />
+            <div className="mt-6">
+              <ReferralWidget />
+            </div>
+          </>
         )}
       </div>
     </main>

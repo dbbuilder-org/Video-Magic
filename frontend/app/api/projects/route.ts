@@ -3,20 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 const BACKEND = process.env.BACKEND_URL || "http://localhost:8000";
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const res = await fetch(`${BACKEND}/stripe/checkout`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-User-Id": userId,
-    },
-    body: JSON.stringify(body),
+  const res = await fetch(`${BACKEND}/projects?user_id=${encodeURIComponent(userId)}`, {
+    headers: { "X-User-Id": userId },
   });
   const data = await res.json();
   return NextResponse.json(data, { status: res.status });

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import PricingCards from "@/components/PricingCards";
 
 export default function LandingPage() {
@@ -9,12 +10,39 @@ export default function LandingPage() {
         <span className="text-xl font-bold text-white">
           <span className="text-brand-cyan">Video</span>Magic
         </span>
-        <Link
-          href="/create"
-          className="px-5 py-2 bg-brand-blue hover:bg-brand-cyan text-white rounded-lg font-medium transition-colors"
-        >
-          Create Video →
-        </Link>
+        <div className="flex items-center gap-4">
+          <SignedOut>
+            <SignInButton mode="redirect">
+              <button className="text-sm text-slate-400 hover:text-white transition-colors">
+                Sign in
+              </button>
+            </SignInButton>
+            <Link
+              href="/create"
+              className="px-5 py-2 bg-brand-blue hover:bg-brand-cyan text-white rounded-lg font-medium transition-colors"
+            >
+              Create Video →
+            </Link>
+          </SignedOut>
+          <SignedIn>
+            <Link
+              href="/create"
+              className="px-5 py-2 bg-brand-blue hover:bg-brand-cyan text-white rounded-lg font-medium transition-colors"
+            >
+              Create Video →
+            </Link>
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "w-9 h-9",
+                  userButtonPopoverCard: "bg-slate-900 border border-white/15",
+                  userButtonPopoverActionButton: "text-slate-300 hover:text-white hover:bg-white/10",
+                  userButtonPopoverFooter: "hidden",
+                },
+              }}
+            />
+          </SignedIn>
+        </div>
       </nav>
 
       {/* Hero */}
@@ -67,7 +95,7 @@ export default function LandingPage() {
             { step: "01", title: "Upload Document", desc: "Paste text, upload a PDF, or type your content. Any format works." },
             { step: "02", title: "Set Your Brand", desc: "Add your brand name, color, and choose video duration (10s, 30s, or 60s)." },
             { step: "03", title: "Pay & Generate", desc: "Checkout with Stripe. Your video pipeline starts immediately after payment." },
-            { step: "04", title: "Download & Edit", desc: "Watch live progress. Edit scenes and re-run any time — included free." },
+            { step: "04", title: "Download & Edit", desc: "Watch live progress. Edit scenes and re-generate any time — included free." },
           ].map(({ step, title, desc }) => (
             <div key={step} className="relative">
               <div className="text-5xl font-black text-brand-navy mb-4">{step}</div>

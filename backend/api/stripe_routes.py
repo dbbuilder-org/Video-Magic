@@ -1,21 +1,26 @@
 """Stripe Checkout — create session and handle webhook."""
-import json
 import os
 
 import stripe
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 from pydantic import BaseModel
 
-from models import create_project, get_project, update_project
+from models import (
+    apply_referral_credit,
+    create_project,
+    deduct_user_credits,
+    get_project,
+    get_user_credits,
+    update_project,
+    upsert_user_profile,
+)
 from api.generate import run_pipeline
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
 
-PRICE_MAP = {
-    10: "STRIPE_PRICE_10S",
-    30: "STRIPE_PRICE_30S",
-    60: "STRIPE_PRICE_60S",
-}
+PRICE_CENTS = {10: 999, 30: 1499, 60: 1999}
+PRICE_MAP   = {10: "STRIPE_PRICE_10S", 30: "STRIPE_PRICE_30S", 60: "STRIPE_PRICE_60S"}
+PRICE_LABEL = {10: "$9.99", 30: "$14.99", 60: "$19.99"}
 
 
 class CheckoutRequest(BaseModel):
@@ -26,7 +31,10 @@ class CheckoutRequest(BaseModel):
 
 
 @router.post("/checkout")
-async def create_checkout(body: CheckoutRequest):
+async def create_checkout(
+    body: CheckoutRequest,
+    x_user_id: str | None = Header(None),
+):
     stripe.api_key = os.environ["STRIPE_SECRET_KEY"]
     app_url = os.environ.get("APP_URL", "http://localhost:3000")
 
@@ -38,25 +46,53 @@ async def create_checkout(body: CheckoutRequest):
     if not price_id:
         raise HTTPException(500, f"Stripe price not configured: {price_env}")
 
-    # Create project record (status=pending until payment confirmed)
     spec = {
         "duration": body.duration,
         "brand_name": body.brand_name,
         "brand_color": body.brand_color,
         "document_text": body.document_text,
     }
-    project = create_project(spec)
+    project = create_project(spec, user_id=x_user_id)
     project_id = project["id"]
 
-    session = stripe.checkout.Session.create(
+    # ── Save brand to user profile ───────────────────────────────────────────
+    if x_user_id:
+        upsert_user_profile(x_user_id, body.brand_name, body.brand_color)
+
+    # ── Credit handling ──────────────────────────────────────────────────────
+    credit_cents = get_user_credits(x_user_id) if x_user_id else 0
+    price_cents = PRICE_CENTS[body.duration]
+    discounts = []
+
+    if credit_cents > 0 and x_user_id:
+        apply_cents = min(credit_cents, price_cents)
+        coupon = stripe.Coupon.create(
+            amount_off=apply_cents,
+            currency="usd",
+            duration="once",
+            name=f"${apply_cents/100:.2f} referral credit",
+        )
+        discounts = [{"coupon": coupon.id}]
+        # Deduct only after payment confirmed (in webhook) — store pending deduction
+        # We pass applied_credit_cents in metadata
+        update_project(project_id, spec={**spec, "pending_credit_cents": apply_cents})
+
+    session_kwargs = dict(
         mode="payment",
         line_items=[{"price": price_id, "quantity": 1}],
-        metadata={"project_id": project_id},
+        metadata={
+            "project_id": project_id,
+            "user_id": x_user_id or "",
+            "credit_cents": str(credit_cents),
+        },
         success_url=f"{app_url}/project/{project_id}?session={{CHECKOUT_SESSION_ID}}",
         cancel_url=f"{app_url}/create?cancelled=1",
     )
+    if discounts:
+        session_kwargs["discounts"] = discounts
 
-    return {"checkout_url": session.url, "project_id": project_id}
+    session = stripe.checkout.Session.create(**session_kwargs)
+    return {"checkout_url": session.url, "project_id": project_id, "credit_applied_cents": apply_cents if credit_cents > 0 else 0}
 
 
 @router.post("/webhook")
@@ -75,10 +111,25 @@ async def stripe_webhook(
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
-        project_id = session.get("metadata", {}).get("project_id")
+        meta = session.get("metadata", {})
+        project_id = meta.get("project_id")
+        user_id = meta.get("user_id") or None
+
         if project_id:
             p = get_project(project_id)
             if p:
+                # Deduct credits that were applied
+                pending_credit = p["spec"].get("pending_credit_cents", 0)
+                if pending_credit and user_id:
+                    try:
+                        deduct_user_credits(user_id, pending_credit)
+                    except ValueError:
+                        pass  # already deducted or insufficient — don't block pipeline
+
+                # Apply referral credit to the referrer (first paid video)
+                if user_id:
+                    apply_referral_credit(user_id)
+
                 bg.add_task(run_pipeline, project_id, p["spec"])
 
     return {"received": True}
