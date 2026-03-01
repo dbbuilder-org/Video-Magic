@@ -3,7 +3,6 @@ services:
   - type: web
     name: video-magic-api
     runtime: python
-    pythonVersion: "3.12"
     region: oregon
     plan: starter             # 512 MB RAM — Veo polling is pure I/O; ffmpeg peaks ~250 MB
                               # Upgrade to standard ($25) only if ffmpeg OOMs on 60s videos
@@ -12,6 +11,8 @@ services:
     rootDir: .
     healthCheckPath: /health
     envVars:
+      - key: RENDER_PYTHON_VERSION
+        value: "3.12.0"
       - key: GEMINI_API_KEY
         sync: false          # set in Render dashboard
       - key: ELEVENLABS_API_KEY
