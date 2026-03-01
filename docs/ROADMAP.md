@@ -52,14 +52,14 @@
 - [ ] **Margin alert** — if `api_cost > price_charged * 0.6`, emit a warning log. A 60s video must not cost more than $12 in API calls on a $19.99 sale.
 - [ ] **Render env var** `COST_ALERT_EMAIL` — send email when margin < 40% (use Resend)
 
-### Estimated API cost per video (current pricing)
-| Duration | Gemini Flash | Imagen 4 | Veo 3.1 | ElevenLabs | ffmpeg | **Total est.** |
-|----------|-------------|----------|---------|-----------|-------|---------------|
-| 10s | ~$0.02 | $0.04 | ~$1.00 | ~$0.05 | $0 | **~$1.11** |
-| 30s | ~$0.03 | $0.04 | ~$3.00 | ~$0.10 | $0 | **~$3.17** |
-| 60s | ~$0.04 | $0.04 | ~$6.00 | ~$0.18 | $0 | **~$6.26** |
+### Estimated API cost per video (updated pricing: $9.99 / $19.99 / $29.99)
+| Duration | Scenes | Gemini Flash | Imagen 4 | Veo 3.1 est. | ElevenLabs | **Total est.** | Price | **Margin** |
+|----------|--------|-------------|----------|-------------|-----------|--------------|-------|-----------|
+| 10s | 2 | ~$0.02 | $0.04 | ~$2.00 | ~$0.05 | **~$2.11** | $9.99 | **~79%** |
+| 30s | 4 | ~$0.03 | $0.04 | ~$4.00 | ~$0.10 | **~$4.17** | $19.99 | **~79%** |
+| 60s | 8 | ~$0.04 | $0.04 | ~$8.00 | ~$0.18 | **~$8.26** | $29.99 | **~72%** |
 
-**Gross margins: 10s ≈ 88%, 30s ≈ 79%, 60s ≈ 68%.** Monitor closely — Veo pricing is not yet published; these are estimates.
+**Gross margins ~72–79%.** Veo pricing is not yet published; $1/scene is an estimate. Monitor via Sprint 0 cost tracking.
 
 ---
 

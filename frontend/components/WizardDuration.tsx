@@ -1,9 +1,9 @@
 "use client";
 
 const DURATIONS = [
-  { value: 10, label: "10 Seconds", price: "$9.99", scenes: 1, desc: "Perfect for social media promos and quick pitches." },
-  { value: 30, label: "30 Seconds", price: "$14.99", scenes: 3, desc: "The ideal length for explainers and product overviews." },
-  { value: 60, label: "60 Seconds", price: "$19.99", scenes: 6, desc: "Full story arc with intro, body, and strong CTA." },
+  { value: 10, label: "10 Seconds", price: "$9.99", scenes: 2, desc: "Perfect for social media promos and quick pitches." },
+  { value: 30, label: "30 Seconds", price: "$19.99", scenes: 4, desc: "The ideal length for explainers and product overviews." },
+  { value: 60, label: "60 Seconds", price: "$29.99", scenes: 8, desc: "Full story arc with intro, body, and strong CTA." },
 ];
 
 interface Props {

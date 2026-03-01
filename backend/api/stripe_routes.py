@@ -18,9 +18,9 @@ from api.generate import run_pipeline
 
 router = APIRouter(prefix="/stripe", tags=["stripe"])
 
-PRICE_CENTS = {10: 999, 30: 1499, 60: 1999}
+PRICE_CENTS = {10: 999, 30: 1999, 60: 2999}
 PRICE_MAP   = {10: "STRIPE_PRICE_10S", 30: "STRIPE_PRICE_30S", 60: "STRIPE_PRICE_60S"}
-PRICE_LABEL = {10: "$9.99", 30: "$14.99", 60: "$19.99"}
+PRICE_LABEL = {10: "$9.99", 30: "$19.99", 60: "$29.99"}
 
 
 class CheckoutRequest(BaseModel):

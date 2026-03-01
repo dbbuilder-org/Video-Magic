@@ -40,7 +40,7 @@ def parse_document(text: str, duration: int, brand_name: str, brand_color: str =
     """Parse document text into structured video spec using Gemini Flash."""
     client = _client()
 
-    scene_count = {10: 1, 30: 3, 60: 6}.get(duration, 3)
+    scene_count = {10: 2, 30: 4, 60: 8}.get(duration, 4)
 
     user_prompt = (
         f"Brand: {brand_name}\n"
