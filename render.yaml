@@ -1,0 +1,66 @@
+services:
+  # ── Backend — FastAPI ─────────────────────────────────────────────────────
+  - type: web
+    name: video-magic-api
+    runtime: python
+    region: oregon
+    plan: standard          # 2 CPU, 2 GB RAM — Veo polling is CPU-light but needs RAM
+    buildCommand: "pip install -r backend/requirements.txt"
+    startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+    rootDir: .
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false          # set in Render dashboard
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        value: nPczCjzI2devNBz1zQrb
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_10S
+        sync: false
+      - key: STRIPE_PRICE_30S
+        sync: false
+      - key: STRIPE_PRICE_60S
+        sync: false
+      - key: APP_URL
+        value: https://videomagic.servicevision.io
+      - key: CORS_ORIGINS
+        value: https://videomagic.servicevision.io
+      - key: STORAGE_DIR
+        value: /opt/render/project/storage/projects
+      - key: DATABASE_PATH
+        value: /opt/render/project/video_magic.db
+    disk:
+      name: video-magic-storage
+      mountPath: /opt/render/project/storage
+      sizeGB: 20
+
+  # ── Frontend — Next.js 16 ─────────────────────────────────────────────────
+  - type: web
+    name: video-magic-frontend
+    runtime: node
+    region: oregon
+    plan: standard
+    rootDir: frontend
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm start"
+    healthCheckPath: /
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: BACKEND_URL
+        fromService:
+          type: web
+          name: video-magic-api
+          property: host
+          transform: "https://{{value}}"
+      - key: NEXT_PUBLIC_BACKEND_URL
+        fromService:
+          type: web
+          name: video-magic-api
+          property: host
+          transform: "https://{{value}}"

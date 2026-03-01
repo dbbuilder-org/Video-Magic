@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+.env
+
+# Node
+node_modules/
+.next/
+.vercel/
+*.local
+
+# SQLite
+*.db
+*.db-wal
+*.db-shm
+
+# Storage (generated videos)
+storage/projects/*/scenes/
+storage/projects/*/overlays/
+storage/projects/*/final.mp4
+storage/projects/*/stitched.mp4
+storage/projects/*/overlaid.mp4
+storage/projects/*/voiceover.mp3
+storage/projects/*/character.png
+
+# macOS
+.DS_Store
