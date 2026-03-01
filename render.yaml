@@ -4,7 +4,8 @@ services:
     name: video-magic-api
     runtime: python
     region: oregon
-    plan: standard          # 2 CPU, 2 GB RAM — Veo polling is CPU-light but needs RAM
+    plan: starter             # 512 MB RAM — Veo polling is pure I/O; ffmpeg peaks ~250 MB
+                              # Upgrade to standard ($25) only if ffmpeg OOMs on 60s videos
     buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
     rootDir: .
@@ -37,14 +38,14 @@ services:
     disk:
       name: video-magic-storage
       mountPath: /opt/render/project/storage
-      sizeGB: 20
+      sizeGB: 1               # 1 GB at $0.25/mo — holds ~20 test videos; scale when needed
 
-  # ── Frontend — Next.js 16 ─────────────────────────────────────────────────
+  # ── Frontend — Next.js ────────────────────────────────────────────────────
   - type: web
     name: video-magic-frontend
     runtime: node
     region: oregon
-    plan: standard
+    plan: starter             # 512 MB RAM — Next.js SSR is fine at this scale
     rootDir: frontend
     buildCommand: "npm install && npm run build"
     startCommand: "npm start"
