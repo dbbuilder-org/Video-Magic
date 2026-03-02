@@ -1,3 +1,5 @@
+> **Superseded by:** [ROADMAP-2026-03-02](ROADMAP-2026-03-02.md) — Updated 2026-03-02
+
 # Roadmap — Video Magic
 
 **Last updated:** 2026-03-01 (rev 2)

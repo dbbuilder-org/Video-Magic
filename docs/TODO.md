@@ -1,3 +1,5 @@
+> **Superseded by:** [ROADMAP-2026-03-02](ROADMAP-2026-03-02.md) — Updated 2026-03-02
+
 # TODO — Video Magic
 
 **Date:** 2026-03-01
