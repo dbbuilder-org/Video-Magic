@@ -8,5 +8,5 @@ elevenlabs==2.3.0
 Pillow==11.1.0
 aiofiles==24.1.0
 httpx==0.28.1
-pydantic==2.10.5
-pydantic-settings==2.7.1
+pydantic==2.12.5
+pydantic-settings==2.13.1
