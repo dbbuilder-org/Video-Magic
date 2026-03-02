@@ -36,7 +36,7 @@ services:
       - key: STORAGE_DIR
         value: /opt/render/project/storage/projects
       - key: DATABASE_PATH
-        value: /opt/render/project/video_magic.db
+        value: /opt/render/project/storage/video_magic.db
     disk:
       name: video-magic-storage
       mountPath: /opt/render/project/storage
