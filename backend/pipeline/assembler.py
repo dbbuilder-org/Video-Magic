@@ -1,4 +1,5 @@
 """ffmpeg — stitch scenes, composite overlays, mix voiceover."""
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -28,7 +29,7 @@ def stitch_scenes(scene_paths: Sequence[Path], out_path: Path) -> Path:
     return out_path
 
 
-TAIL_SILENCE_S = 1.5  # seconds of silence after narrator finishes
+TAIL_SILENCE_S = float(os.environ.get("VIDEO_TAIL_SILENCE_S", "1.5"))
 
 
 def mix_voiceover(video_path: Path, vo_path: Path, out_path: Path) -> Path:

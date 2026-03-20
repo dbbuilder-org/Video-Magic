@@ -37,6 +37,8 @@ services:
         value: /opt/render/project/storage/projects
       - key: DATABASE_PATH
         value: /opt/render/project/storage/video_magic.db
+      - key: VIDEO_TAIL_SILENCE_S
+        value: "1.5"             # seconds of freeze-frame + silence after narrator finishes
       - key: GEMINI_FLASH_MODEL
         value: AUTO              # AUTO = auto-select from fallback chain; set a model name to pin
       - key: IMAGEN_MODEL
