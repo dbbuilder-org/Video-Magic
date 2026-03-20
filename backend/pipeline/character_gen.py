@@ -6,6 +6,7 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 from PIL import Image
+import model_config
 
 
 def _client() -> genai.Client:
@@ -28,7 +29,7 @@ def generate_character(brand_name: str, brand_description: str, out_path: Path) 
     )
 
     resp = client.models.generate_images(
-        model="imagen-4.0-generate-001",
+        model=model_config.IMAGEN_MODEL,
         prompt=prompt,
         config=types.GenerateImagesConfig(
             numberOfImages=1,

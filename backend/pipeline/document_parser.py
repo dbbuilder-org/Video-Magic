@@ -5,6 +5,7 @@ from typing import Any
 
 from google import genai
 from google.genai import types
+import model_config
 
 
 def _client() -> genai.Client:
@@ -50,7 +51,7 @@ def parse_document(text: str, duration: int, brand_name: str, brand_color: str =
     )
 
     resp = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model=model_config.FLASH_MODEL,
         contents=[
             types.Content(role="user", parts=[types.Part(text=user_prompt)])
         ],

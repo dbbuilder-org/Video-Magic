@@ -7,10 +7,10 @@ from typing import Callable
 
 from google import genai
 from google.genai import types
+import model_config
 
 POLL_INTERVAL = 10
 MAX_POLL_WAIT = 360
-VIDEO_MODEL = "veo-3.1-generate-preview"
 
 
 def _client() -> genai.Client:
@@ -46,7 +46,7 @@ def generate_scene(
 
     # Veo 3.1 prompts must contain ZERO readable words per the text-overlay rule.
     operation = client.models.generate_videos(
-        model=VIDEO_MODEL,
+        model=model_config.VEO_MODEL,
         prompt=prompt,
         config=types.GenerateVideosConfig(
             aspect_ratio="16:9",

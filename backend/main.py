@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from models import create_tables
+from model_config import resolve_models, _resolved
 from api.projects import router as projects_router
 from api.stripe_routes import router as stripe_router
 from api.users import router as users_router
@@ -40,8 +41,9 @@ app.mount("/storage", StaticFiles(directory=str(STORAGE_DIR)), name="storage")
 @app.on_event("startup")
 async def startup():
     create_tables()
+    resolve_models()
 
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "models": _resolved}
