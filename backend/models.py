@@ -1,5 +1,6 @@
 """SQLite models — projects, jobs, user_profiles, referrals, user_credits."""
 import json
+import os
 import random
 import sqlite3
 import string
@@ -8,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-DATABASE_PATH = Path("./video_magic.db")
+DATABASE_PATH = Path(os.environ.get("DATABASE_PATH", "./video_magic.db"))
 
 
 def _connect() -> sqlite3.Connection:
