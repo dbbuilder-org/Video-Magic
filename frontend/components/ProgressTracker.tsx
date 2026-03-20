@@ -47,51 +47,98 @@ interface Props {
   onError: (msg: string) => void;
 }
 
+const POLL_INTERVAL_MS = 8_000;
+const MAX_BACKOFF_MS = 30_000;
+
 export default function ProgressTracker({ projectId, onComplete, onError }: Props) {
   const [events, setEvents] = useState<ProgressEvent[]>([]);
   const [currentPct, setCurrentPct] = useState(0);
   const [currentStage, setCurrentStage] = useState("");
   const [done, setDone] = useState(false);
   const esRef = useRef<EventSource | null>(null);
+  const retryMs = useRef(2_000);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finishedRef = useRef(false);
+
+  // Polling fallback: if SSE drops during a slow stage, this catches done/error
+  useEffect(() => {
+    if (done) return;
+    const id = setInterval(async () => {
+      if (finishedRef.current) return;
+      try {
+        const res = await fetch(`/api/projects/${projectId}`);
+        if (!res.ok) return;
+        const p = await res.json();
+        if (p.status === "done" && p.video_url) {
+          finishedRef.current = true;
+          setDone(true);
+          onComplete(p.video_url);
+        } else if (p.status === "error") {
+          finishedRef.current = true;
+          onError(p.error || "Pipeline error");
+        }
+      } catch { /* ignore */ }
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, [projectId, done, onComplete, onError]);
 
   useEffect(() => {
-    const es = new EventSource(`/api/progress/${projectId}`);
-    esRef.current = es;
+    let cancelled = false;
 
-    es.onmessage = (e) => {
-      try {
-        const data: ProgressEvent = JSON.parse(e.data);
-        setEvents((prev) => {
-          const idx = prev.findIndex((p) => p.stage === data.stage);
-          if (idx >= 0) {
-            const next = [...prev];
-            next[idx] = data;
-            return next;
+    function connect() {
+      if (cancelled || finishedRef.current) return;
+
+      const es = new EventSource(`/api/progress/${projectId}`);
+      esRef.current = es;
+
+      es.onmessage = (e) => {
+        retryMs.current = 2_000; // reset backoff on successful message
+        try {
+          const data: ProgressEvent = JSON.parse(e.data);
+          setEvents((prev) => {
+            const idx = prev.findIndex((p) => p.stage === data.stage);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = data;
+              return next;
+            }
+            return [...prev, data];
+          });
+          setCurrentPct(data.pct);
+          setCurrentStage(data.stage);
+
+          if (data.stage === "done" || data.pct === 100) {
+            finishedRef.current = true;
+            setDone(true);
+            es.close();
+            onComplete(data.detail || "");
           }
-          return [...prev, data];
-        });
-        setCurrentPct(data.pct);
-        setCurrentStage(data.stage);
+          if (data.stage === "error") {
+            finishedRef.current = true;
+            es.close();
+            onError(data.detail || "Pipeline error");
+          }
+        } catch { /* ignore parse errors */ }
+      };
 
-        if (data.stage === "done" || data.pct === 100) {
-          setDone(true);
-          es.close();
-          onComplete(data.detail || "");
-        }
-        if (data.stage === "error") {
-          es.close();
-          onError(data.detail || "Pipeline error");
-        }
-      } catch {
-        // ignore parse errors
-      }
+      es.onerror = () => {
+        es.close();
+        if (cancelled || finishedRef.current) return;
+        // Exponential backoff reconnect
+        retryTimer.current = setTimeout(() => {
+          retryMs.current = Math.min(retryMs.current * 2, MAX_BACKOFF_MS);
+          connect();
+        }, retryMs.current);
+      };
+    }
+
+    connect();
+
+    return () => {
+      cancelled = true;
+      esRef.current?.close();
+      if (retryTimer.current) clearTimeout(retryTimer.current);
     };
-
-    es.onerror = () => {
-      es.close();
-    };
-
-    return () => es.close();
   }, [projectId, onComplete, onError]);
 
   const stageOrder = Object.keys(STAGE_PCT);
