@@ -121,6 +121,8 @@ def update_project(pid: str, **kwargs: Any) -> dict | None:
     if not kwargs:
         return get_project(pid)
     kwargs["updated_at"] = _now()
+    # Serialise any dict/list values (e.g. spec=) before binding to SQLite
+    kwargs = {k: json.dumps(v) if isinstance(v, (dict, list)) else v for k, v in kwargs.items()}
     sets = ", ".join(f"{k} = ?" for k in kwargs)
     vals = list(kwargs.values()) + [pid]
     conn = _connect()
