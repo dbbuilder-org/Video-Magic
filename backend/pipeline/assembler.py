@@ -28,24 +28,27 @@ def stitch_scenes(scene_paths: Sequence[Path], out_path: Path) -> Path:
     return out_path
 
 
+TAIL_SILENCE_S = 1.5  # seconds of silence after narrator finishes
+
+
 def mix_voiceover(video_path: Path, vo_path: Path, out_path: Path) -> Path:
     """Mute native Veo audio, mix in voiceover at full volume.
-    If VO is longer than the video, hold the last frame to avoid cut-off."""
+    Always adds TAIL_SILENCE_S seconds of freeze-frame + silence after VO ends."""
     vid_dur = get_video_duration(video_path)
     vo_dur = get_video_duration(vo_path)
-    extra = max(0.0, vo_dur - vid_dur + 0.5)  # +0.5s breathing room
+    # Extend video to: max(video, VO) + tail silence
+    target_dur = max(vid_dur, vo_dur) + TAIL_SILENCE_S
+    extra = target_dur - vid_dur  # always >= TAIL_SILENCE_S
 
-    if extra > 0:
-        # Freeze last frame to cover full VO length
-        video_filter = (
-            f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.2f}[vout]"
-        )
-        v_map = "[vout]"
-    else:
-        video_filter = None
-        v_map = "0:v"
+    video_filter = f"[0:v]tpad=stop_mode=clone:stop_duration={extra:.2f}[vout]"
+    v_map = "[vout]"
 
-    audio_filter = "[0:a]volume=0.0[bg];[1:a]volume=1.0[vo];[bg][vo]amix=inputs=2:duration=longest[aout]"
+    # Pad VO audio with silence so amix sees the full target duration
+    audio_filter = (
+        f"[1:a]apad=pad_dur={TAIL_SILENCE_S:.2f}[vopad];"
+        "[0:a]volume=0.0[bg];"
+        "[bg][vopad]amix=inputs=2:duration=longest[aout]"
+    )
 
     if video_filter:
         filter_complex = f"{video_filter};{audio_filter}"
