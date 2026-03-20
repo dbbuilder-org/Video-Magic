@@ -14,7 +14,7 @@ from storage import (
     scenes_dir,
     voiceover_path,
 )
-from pipeline.assembler import get_video_duration, mix_voiceover, stitch_scenes
+from pipeline.assembler import get_video_dimensions, get_video_duration, mix_voiceover, stitch_scenes
 from pipeline.character_gen import generate_character
 from pipeline.document_parser import parse_document
 from pipeline.scene_gen import generate_scene
@@ -149,12 +149,16 @@ async def _run_pipeline_inner(project_id: str, spec: dict) -> None:
     await _emit(project_id, "overlay", 93, "Compositing text overlays...")
 
     total_dur = await loop.run_in_executor(None, get_video_duration, stitched)
+    video_w, video_h = await loop.run_in_executor(None, get_video_dimensions, stitched)
     scene_dur = total_dur / max(scene_count, 1)
+    title_dur = min(3.0, scene_dur)
 
-    lower_thirds_timed = [
-        (lower_third_pngs[i], i * scene_dur + 0.5, (i + 1) * scene_dur - 0.5)
-        for i in range(min(len(lower_third_pngs), scene_count))
-    ]
+    lower_thirds_timed = []
+    for i in range(min(len(lower_third_pngs), scene_count)):
+        # First lower-third starts after title card clears; rest start at scene boundary
+        start = max(title_dur + 0.3, i * scene_dur + 0.5) if i == 0 else i * scene_dur + 0.5
+        end = (i + 1) * scene_dur - 0.5
+        lower_thirds_timed.append((lower_third_pngs[i], start, end))
 
     overlaid = project_dir(project_id) / "overlaid.mp4"
     await loop.run_in_executor(
@@ -163,11 +167,13 @@ async def _run_pipeline_inner(project_id: str, spec: dict) -> None:
         stitched,
         overlaid,
         title_png if title_png.exists() else None,
-        min(3.0, scene_dur),
+        title_dur,
         lower_thirds_timed,
         cta_png if cta and cta_png.exists() else None,
         max(total_dur - 3.0, total_dur * 0.85),
         total_dur,
+        video_w,
+        video_h,
     )
     await _emit_done(project_id, "overlay", 93)
 

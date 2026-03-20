@@ -1,6 +1,7 @@
 """Pillow — generate text overlay PNGs; ffmpeg composite at timestamps."""
 import subprocess
 import shutil
+import textwrap
 from pathlib import Path
 from typing import Sequence
 
@@ -11,6 +12,19 @@ FFMPEG = shutil.which("ffmpeg") or "/opt/homebrew/bin/ffmpeg"
 W, H = 1920, 1080
 LOWER_H = int(H * 0.18)   # Lower-third bar height
 TITLE_H = H                # Full-frame title card
+
+
+def _fit_text(draw: ImageDraw.Draw, text: str, max_width: int, start_size: int) -> tuple[ImageFont.FreeTypeFont | ImageFont.ImageFont, list[str]]:
+    """Return (font, lines) that fit within max_width by wrapping then shrinking."""
+    for size in range(start_size, 20, -4):
+        font = _font(size)
+        # Try progressively more aggressive wrapping
+        for max_chars in range(60, 10, -5):
+            lines = textwrap.wrap(text, width=max_chars) or [text]
+            if all(draw.textbbox((0, 0), ln, font=font)[2] <= max_width for ln in lines):
+                return font, lines
+    font = _font(24)
+    return font, textwrap.wrap(text, width=40) or [text]
 
 
 def _font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -53,21 +67,30 @@ def make_title_card(
     draw.rectangle([(0, 0), (W, 12)], fill=(r, g, b, 255))
     draw.rectangle([(0, H - 12), (W, H)], fill=(r, g, b, 255))
 
-    # Title text
-    title_font = _font(96)
+    # Title text — auto-wrap and shrink to fit
+    title_font, title_lines = _fit_text(draw, title, int(W * 0.88), 96)
     tagline_font = _font(48)
     brand_font = _font(36)
 
-    # Center title
-    bbox = draw.textbbox((0, 0), title, font=title_font)
-    tw = bbox[2] - bbox[0]
-    ty = H // 2 - 120
-    draw.text(((W - tw) // 2, ty), title, font=title_font, fill=(255, 255, 255, 255))
+    line_h = draw.textbbox((0, 0), "Ag", font=title_font)[3] + 8
+    total_title_h = line_h * len(title_lines)
+    ty = H // 2 - total_title_h // 2 - 40
+    for ln in title_lines:
+        bbox = draw.textbbox((0, 0), ln, font=title_font)
+        tw = bbox[2] - bbox[0]
+        draw.text(((W - tw) // 2, ty), ln, font=title_font, fill=(255, 255, 255, 255))
+        ty += line_h
 
     # Center tagline
-    bbox = draw.textbbox((0, 0), tagline, font=tagline_font)
-    tw = bbox[2] - bbox[0]
-    draw.text(((W - tw) // 2, ty + 130), tagline, font=tagline_font, fill=(200, 220, 255, 220))
+    tagline_y = ty + 20
+    if tagline:
+        _, tagline_lines = _fit_text(draw, tagline, int(W * 0.80), 48)
+        tl_h = draw.textbbox((0, 0), "Ag", font=tagline_font)[3] + 6
+        for ln in tagline_lines:
+            bbox = draw.textbbox((0, 0), ln, font=tagline_font)
+            tw = bbox[2] - bbox[0]
+            draw.text(((W - tw) // 2, tagline_y), ln, font=tagline_font, fill=(200, 220, 255, 220))
+            tagline_y += tl_h
 
     # Brand name bottom-right
     draw.text((W - 320, H - 80), brand_name, font=brand_font, fill=(r, g, b, 200))
@@ -93,12 +116,16 @@ def make_lower_third(
     # Background bar
     draw.rectangle([(0, 0), (W, LOWER_H)], fill=(r, g, b, 210))
 
-    # Caption text
-    font = _font(56)
-    bbox = draw.textbbox((0, 0), caption, font=font)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-    draw.text(((W - tw) // 2, (LOWER_H - th) // 2), caption, font=font, fill=(255, 255, 255, 255))
+    # Caption text — auto-wrap to fit
+    font, lines = _fit_text(draw, caption, int(W * 0.88), 56)
+    line_h = draw.textbbox((0, 0), "Ag", font=font)[3] + 6
+    total_h = line_h * len(lines)
+    cy = (LOWER_H - total_h) // 2
+    for ln in lines:
+        bbox = draw.textbbox((0, 0), ln, font=font)
+        tw = bbox[2] - bbox[0]
+        draw.text(((W - tw) // 2, cy), ln, font=font, fill=(255, 255, 255, 255))
+        cy += line_h
 
     img.save(out_path, "PNG")
     return out_path
@@ -149,61 +176,61 @@ def composite_overlays(
     cta_png: Path | None,
     cta_start: float,
     total_duration: float,
+    video_w: int = 1920,
+    video_h: int = 1080,
 ) -> Path:
-    """Use ffmpeg overlay filter to composite all text PNGs onto base video."""
-    # Build filter_complex
+    """Use ffmpeg overlay filter to composite all text PNGs onto base video.
+    Overlays are scaled to the actual video dimensions before compositing."""
+    lower_h = int(video_h * 0.18)
+
     inputs = [FFMPEG, "-y", "-i", str(base_video)]
-    overlay_inputs = []
-    filter_parts = []
+    # Each entry: (input_idx, is_full_frame, start_s, end_s)
+    overlay_inputs: list[tuple[int, bool, float, float]] = []
     input_idx = 1
 
     if title_png and title_png.exists():
         inputs += ["-i", str(title_png)]
-        overlay_inputs.append((input_idx, 0, title_duration))
+        overlay_inputs.append((input_idx, True, 0.0, title_duration))
         input_idx += 1
 
     for png, start, end in lower_thirds:
         if png.exists():
             inputs += ["-i", str(png)]
-            overlay_inputs.append((input_idx, start, end))
+            overlay_inputs.append((input_idx, False, start, end))
             input_idx += 1
 
     if cta_png and cta_png.exists():
         inputs += ["-i", str(cta_png)]
-        overlay_inputs.append((input_idx, cta_start, total_duration))
+        overlay_inputs.append((input_idx, True, cta_start, total_duration))
         input_idx += 1
 
     if not overlay_inputs:
-        # No overlays — just copy
         cmd = [FFMPEG, "-y", "-i", str(base_video), "-c", "copy", str(out_path)]
         subprocess.run(cmd, check=True, capture_output=True)
         return out_path
 
-    # Build chained overlay filter
+    # Scale each overlay to video dims, then chain overlays
+    scale_parts = []
+    overlay_parts = []
     current = "[0:v]"
-    for i, (img_idx, start_s, end_s) in enumerate(overlay_inputs):
-        label_in = current
-        label_out = f"[v{i}]"
-        y_pos = 0 if i == 0 and title_png else f"H-{LOWER_H}"
-        if img_idx == 1 and title_png:
-            # title card: full overlay
-            y_pos = 0
-        elif cta_png and img_idx == len(overlay_inputs):
+
+    for i, (img_idx, is_full, start_s, end_s) in enumerate(overlay_inputs):
+        scaled = f"[s{i}]"
+        if is_full:
+            scale_parts.append(f"[{img_idx}:v]scale={video_w}:{video_h}{scaled}")
             y_pos = 0
         else:
-            y_pos = f"H-{LOWER_H}"
+            scale_parts.append(f"[{img_idx}:v]scale={video_w}:{lower_h}{scaled}")
+            y_pos = video_h - lower_h
 
+        label_out = f"[v{i}]"
         enable = f"between(t,{start_s:.2f},{end_s:.2f})"
-        filter_parts.append(
-            f"{label_in}[{img_idx}:v]overlay=0:{y_pos}:enable='{enable}'{label_out}"
+        overlay_parts.append(
+            f"{current}{scaled}overlay=0:{y_pos}:enable='{enable}'{label_out}"
         )
         current = label_out
 
-    filter_complex = ";".join(filter_parts)
-    # Rename last label to [vout]
-    filter_complex = filter_complex.rsplit(current, 1)[0] + current.replace(current, "[vout]")
-    # Simpler approach: just chain
-    filter_complex = ";".join(filter_parts)
+    filter_complex = ";".join(scale_parts + overlay_parts)
     last_label = f"[v{len(overlay_inputs)-1}]"
 
     cmd = inputs + [
