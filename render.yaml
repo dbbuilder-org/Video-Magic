@@ -37,6 +37,12 @@ services:
         value: /opt/render/project/storage/projects
       - key: DATABASE_PATH
         value: /opt/render/project/storage/video_magic.db
+      - key: GEMINI_FLASH_MODEL
+        value: AUTO              # AUTO = auto-select from fallback chain; set a model name to pin
+      - key: IMAGEN_MODEL
+        value: AUTO
+      - key: VEO_MODEL
+        value: AUTO
     disk:
       name: video-magic-storage
       mountPath: /opt/render/project/storage

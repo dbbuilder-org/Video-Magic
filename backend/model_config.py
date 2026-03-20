@@ -92,7 +92,7 @@ def resolve_models() -> dict[str, str]:
         # Env var override takes priority — skip validation, trust the operator.
         env_key = _ENV_OVERRIDES.get(slot, "")
         env_val = os.environ.get(env_key, "").strip()
-        if env_val:
+        if env_val and env_val.upper() != "AUTO":
             log.info("model_config: %s → %s (from env %s)", slot, env_val, env_key)
             _resolved[slot] = env_val
             continue
