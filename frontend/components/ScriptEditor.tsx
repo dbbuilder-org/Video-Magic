@@ -41,7 +41,7 @@ export default function ScriptEditor({ projectId, spec, onSaved }: Props) {
     setSaving(true);
     setError("");
     try {
-      const res = await fetch(`/api/backend/projects/${projectId}/spec`, {
+      const res = await fetch(`/api/projects/${projectId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ spec: { doc_spec: local } }),

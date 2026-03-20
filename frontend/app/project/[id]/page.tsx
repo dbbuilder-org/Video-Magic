@@ -39,7 +39,7 @@ function ProjectPageInner() {
   useEffect(() => {
     async function loadProject() {
       try {
-        const res = await fetch(`/api/backend/projects/${projectId}`);
+        const res = await fetch(`/api/projects/${projectId}`);
         if (!res.ok) throw new Error("Project not found");
         const p: Project = await res.json();
         setProject(p);
@@ -60,7 +60,7 @@ function ProjectPageInner() {
     setVideoUrl(url);
     setRerunning(false);
     // Refresh project to get latest spec
-    fetch(`/api/backend/projects/${projectId}`)
+    fetch(`/api/projects/${projectId}`)
       .then((r) => r.json())
       .then(setProject)
       .catch(() => {});
