@@ -135,6 +135,46 @@ async def stripe_webhook(
     return {"received": True}
 
 
+FREE_EMAILS = {"dbbuilderio@gmail.com"}
+FREE_DOMAINS = {"servicevision.net"}
+
+
+@router.post("/free-checkout")
+async def free_checkout(
+    body: CheckoutRequest,
+    bg: BackgroundTasks,
+    x_user_id: str | None = Header(None),
+    x_user_email: str | None = Header(None),
+):
+    """Bypass Stripe for internal/staff accounts. Caller must supply X-User-Email."""
+    app_url = os.environ.get("APP_URL", "http://localhost:3000")
+
+    email = (x_user_email or "").lower().strip()
+    domain = email.split("@")[-1] if "@" in email else ""
+    if email not in FREE_EMAILS and domain not in FREE_DOMAINS:
+        raise HTTPException(403, "Not eligible for free access")
+
+    spec = {
+        "duration": body.duration,
+        "brand_name": body.brand_name,
+        "brand_color": body.brand_color,
+        "document_text": body.document_text,
+    }
+    project = create_project(spec, user_id=x_user_id)
+    project_id = project["id"]
+
+    if x_user_id:
+        upsert_user_profile(x_user_id, body.brand_name, body.brand_color)
+
+    bg.add_task(run_pipeline, project_id, spec)
+
+    return {
+        "checkout_url": f"{app_url}/project/{project_id}",
+        "project_id": project_id,
+        "free": True,
+    }
+
+
 @router.get("/prices")
 async def get_prices():
     return {
