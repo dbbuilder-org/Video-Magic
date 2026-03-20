@@ -46,4 +46,5 @@ async def startup():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "models": _resolved}
+    import models as _models
+    return {"status": "ok", "models": _resolved, "db": str(_models.DATABASE_PATH)}
