@@ -13,9 +13,18 @@ export async function GET(
   }
 
   const { id } = await params;
-  const res = await fetch(`${BACKEND}/projects/${id}`, {
-    headers: { "X-User-Id": userId },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BACKEND}/projects/${id}`, {
+      headers: { "X-User-Id": userId },
+    });
+  } catch {
+    return NextResponse.json({ detail: "Backend unreachable" }, { status: 503 });
+  }
+  const ct = res.headers.get("content-type") ?? "";
+  if (!ct.includes("application/json")) {
+    return NextResponse.json({ detail: "Backend unavailable" }, { status: 503 });
+  }
   const data = await res.json();
   return NextResponse.json(data, { status: res.status });
 }
@@ -31,14 +40,23 @@ export async function PATCH(
 
   const { id } = await params;
   const body = await req.json();
-  const res = await fetch(`${BACKEND}/projects/${id}/spec`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
-      "X-User-Id": userId,
-    },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BACKEND}/projects/${id}/spec`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": userId,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return NextResponse.json({ detail: "Backend unreachable" }, { status: 503 });
+  }
+  const ct = res.headers.get("content-type") ?? "";
+  if (!ct.includes("application/json")) {
+    return NextResponse.json({ detail: "Backend unavailable" }, { status: 503 });
+  }
   const data = await res.json();
   return NextResponse.json(data, { status: res.status });
 }

@@ -21,6 +21,7 @@ def stitch_scenes(scene_paths: Sequence[Path], out_path: Path) -> Path:
         "-i", str(concat_list),
         "-c:v", "libx264", "-crf", "18", "-preset", "fast",
         "-c:a", "aac", "-b:a", "192k",
+        "-ar", "44100", "-ac", "2",   # normalise audio so mismatched Veo streams don't break concat
         str(out_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
