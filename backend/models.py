@@ -148,6 +148,18 @@ def list_projects_by_user(user_id: str) -> list[dict]:
     return [_project_row(r) for r in rows]
 
 
+def count_projects_today(user_id: str) -> int:
+    """Count projects created today (UTC) for a user, excluding errored ones."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    conn = _connect()
+    row = conn.execute(
+        "SELECT COUNT(*) FROM projects WHERE user_id = ? AND created_at >= ? AND status != 'error'",
+        (user_id, today),
+    ).fetchone()
+    conn.close()
+    return row[0] if row else 0
+
+
 def update_project(pid: str, **kwargs: Any) -> dict | None:
     if not kwargs:
         return get_project(pid)

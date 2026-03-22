@@ -145,6 +145,31 @@ def test_free_checkout_creates_project_in_db(mock_pipeline, client):
     assert p["spec"]["brand_name"] == "SV"
 
 
+# ── Free checkout daily limit ─────────────────────────────────────────────────
+
+@patch("api.stripe_routes.run_pipeline")
+def test_free_checkout_blocked_after_first_video_today(mock_pipeline, client):
+    uid = "sv_daily_limit_user"
+    payload = {"duration": 10, "brand_name": "X", "document_text": "y"}
+    headers = {"X-User-Id": uid, "X-User-Email": "limit@servicevision.net"}
+    r1 = client.post("/stripe/free-checkout", json=payload, headers=headers)
+    assert r1.status_code == 200
+    r2 = client.post("/stripe/free-checkout", json=payload, headers=headers)
+    assert r2.status_code == 429
+    assert "1 video per day" in r2.json()["detail"]
+
+
+@patch("api.stripe_routes.run_pipeline")
+def test_free_checkout_different_users_independent_limits(mock_pipeline, client):
+    payload = {"duration": 10, "brand_name": "X", "document_text": "y"}
+    r1 = client.post("/stripe/free-checkout", json=payload,
+                     headers={"X-User-Id": "sv_user_a", "X-User-Email": "a@servicevision.net"})
+    r2 = client.post("/stripe/free-checkout", json=payload,
+                     headers={"X-User-Id": "sv_user_b", "X-User-Email": "b@servicevision.net"})
+    assert r1.status_code == 200
+    assert r2.status_code == 200
+
+
 # ── Cost breakdown ────────────────────────────────────────────────────────────
 
 def test_cost_breakdown_empty(client):

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from models import (
     apply_referral_credit,
+    count_projects_today,
     create_project,
     deduct_user_credits,
     get_project,
@@ -153,6 +154,9 @@ async def free_checkout(
     domain = email.split("@")[-1] if "@" in email else ""
     if email not in FREE_EMAILS and domain not in FREE_DOMAINS:
         raise HTTPException(403, "Not eligible for free access")
+
+    if x_user_id and count_projects_today(x_user_id) >= 1:
+        raise HTTPException(429, "Free accounts are limited to 1 video per day")
 
     spec = {
         "duration": body.duration,
