@@ -73,9 +73,22 @@ def create_tables() -> None:
             updated_at      TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS api_costs (
+            id          TEXT PRIMARY KEY,
+            project_id  TEXT NOT NULL REFERENCES projects(id),
+            service     TEXT NOT NULL,
+            model       TEXT NOT NULL,
+            operation   TEXT NOT NULL,
+            units       REAL NOT NULL,
+            unit_type   TEXT NOT NULL,
+            cost_usd    REAL NOT NULL,
+            created_at  TEXT NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS idx_jobs_project_id ON jobs(project_id);
         CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
         CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id);
+        CREATE INDEX IF NOT EXISTS idx_api_costs_project_id ON api_costs(project_id);
     """)
     conn.commit()
     conn.close()
@@ -301,6 +314,40 @@ def get_user_credits(user_id: str) -> int:
     conn.close()
     return row["balance_cents"] if row else 0
 
+
+# ── API Costs ─────────────────────────────────────────────────────────────────
+
+def log_api_cost(
+    project_id: str,
+    service: str,
+    model: str,
+    operation: str,
+    units: float,
+    unit_type: str,
+    cost_usd: float,
+) -> None:
+    now = _now()
+    conn = _connect()
+    conn.execute(
+        "INSERT INTO api_costs (id, project_id, service, model, operation, units, unit_type, cost_usd, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (str(uuid.uuid4()), project_id, service, model, operation, units, unit_type, round(cost_usd, 6), now),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_project_costs(project_id: str) -> list[dict]:
+    conn = _connect()
+    rows = conn.execute(
+        "SELECT * FROM api_costs WHERE project_id = ? ORDER BY created_at",
+        (project_id,),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+# ── User Credits ──────────────────────────────────────────────────────────────
 
 def deduct_user_credits(user_id: str, amount_cents: int) -> int:
     """Deduct credits. Returns new balance. Raises if insufficient."""

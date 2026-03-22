@@ -187,3 +187,36 @@ def test_deduct_credits():
 def test_deduct_credits_insufficient():
     with pytest.raises(ValueError, match="Insufficient"):
         models.deduct_user_credits("broke_user", 100)
+
+
+# ── API Costs ──────────────────────────────────────────────────────────────────
+
+def test_log_and_get_api_costs():
+    p = models.create_project({})
+    models.log_api_cost(p["id"], "gemini", "gemini-2.5-flash", "parse_document", 500, "tokens", 0.000075)
+    models.log_api_cost(p["id"], "imagen", "imagen-4.0-generate-001", "character_gen", 1, "images", 0.04)
+    costs = models.get_project_costs(p["id"])
+    assert len(costs) == 2
+    services = {c["service"] for c in costs}
+    assert services == {"gemini", "imagen"}
+
+
+def test_api_costs_sum():
+    p = models.create_project({})
+    models.log_api_cost(p["id"], "veo", "veo-3.1-generate-preview", "scene_0", 8.0, "seconds", 2.80)
+    models.log_api_cost(p["id"], "elevenlabs", "eleven_turbo_v2_5", "voiceover", 200, "characters", 0.06)
+    costs = models.get_project_costs(p["id"])
+    total = sum(c["cost_usd"] for c in costs)
+    assert abs(total - 2.86) < 0.001
+
+
+def test_api_costs_isolated_per_project():
+    p1 = models.create_project({})
+    p2 = models.create_project({})
+    models.log_api_cost(p1["id"], "gemini", "m", "op", 1, "tokens", 0.001)
+    assert models.get_project_costs(p2["id"]) == []
+
+
+def test_api_costs_empty_for_new_project():
+    p = models.create_project({})
+    assert models.get_project_costs(p["id"]) == []

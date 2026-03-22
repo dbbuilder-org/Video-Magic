@@ -24,18 +24,26 @@ async def emit_async(project_id: str, stage: str, pct: int, detail: str = "") ->
 
 
 async def subscribe(project_id: str) -> AsyncGenerator[str, None]:
-    """Yield SSE data strings for the given project."""
+    """Yield SSE data strings for the given project.
+
+    Sends keep-alive pings every 30s when idle (loop continues — no disconnect).
+    Cleans up the _queues entry when the last subscriber leaves (TTL fix).
+    """
     q: asyncio.Queue = asyncio.Queue(maxsize=256)
     _queues[project_id].append(q)
     try:
         while True:
-            payload = await asyncio.wait_for(q.get(), timeout=30)
-            yield f"data: {payload}\n\n"
-            parsed = json.loads(payload)
-            if parsed.get("pct") == 100 or parsed.get("stage") == "error":
-                break
-    except asyncio.TimeoutError:
-        # Keep-alive ping
-        yield ": ping\n\n"
+            try:
+                payload = await asyncio.wait_for(q.get(), timeout=30)
+                yield f"data: {payload}\n\n"
+                parsed = json.loads(payload)
+                if parsed.get("pct") == 100 or parsed.get("stage") == "error":
+                    break
+            except asyncio.TimeoutError:
+                # Keep-alive ping — loop continues, no disconnect
+                yield ": ping\n\n"
     finally:
         _queues[project_id].remove(q)
+        # TTL cleanup: remove the key when no subscribers remain
+        if not _queues[project_id]:
+            del _queues[project_id]

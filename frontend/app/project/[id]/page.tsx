@@ -78,6 +78,22 @@ function ProjectPageInner() {
     setTab("progress");
   }, []);
 
+  const handleReprocess = useCallback(async () => {
+    setErrorMsg("");
+    try {
+      const res = await fetch(`/api/projects/${projectId}/reprocess`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.detail || "Failed to start reprocessing");
+      }
+      handleRerun();
+    } catch (e: unknown) {
+      setErrorMsg(e instanceof Error ? e.message : "Failed to start reprocessing");
+    }
+  }, [projectId, handleRerun]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -174,8 +190,8 @@ function ProjectPageInner() {
                 <div className="text-5xl mb-4">🎉</div>
                 <p className="text-lg text-white font-semibold mb-2">Your video is ready!</p>
                 <p className="mb-6">Use the Edit Script tab to adjust and re-generate any time.</p>
-                <button onClick={handleRerun} className="px-6 py-3 bg-brand-blue hover:bg-brand-cyan text-white rounded-xl font-medium transition-colors">
-                  Re-run Pipeline →
+                <button onClick={handleReprocess} className="px-6 py-3 bg-brand-blue hover:bg-brand-cyan text-white rounded-xl font-medium transition-colors">
+                  Reprocess Video →
                 </button>
               </div>
             ) : (

@@ -3,7 +3,11 @@ import asyncio
 import traceback
 from pathlib import Path
 
-from models import update_project, upsert_job
+import json as _json
+
+import model_config
+from models import log_api_cost, update_project, upsert_job
+from pipeline.costs import est_elevenlabs, est_gemini_flash, est_imagen4, est_veo31
 from progress import emit_async
 from storage import (
     character_path,
@@ -66,6 +70,11 @@ async def _run_pipeline_inner(project_id: str, spec: dict) -> None:
             None, parse_document, document_text, duration, brand_name, brand_color
         )
         update_project(project_id, spec={**spec, "doc_spec": doc_spec})
+        # Log cost: estimate tokens from text lengths
+        doc_spec_str = _json.dumps(doc_spec)
+        in_tok, out_tok, cost = est_gemini_flash(document_text, doc_spec_str)
+        log_api_cost(project_id, "gemini", model_config.FLASH_MODEL, "parse_document",
+                     in_tok + out_tok, "tokens", cost)
 
     await _emit_done(project_id, "parse_document", 12)
 
@@ -82,6 +91,8 @@ async def _run_pipeline_inner(project_id: str, spec: dict) -> None:
     await loop.run_in_executor(
         None, generate_character, brand_name, brand_description, char_path
     )
+    log_api_cost(project_id, "imagen", model_config.IMAGEN_MODEL, "character_gen",
+                 1, "images", est_imagen4(1))
     await _emit_done(project_id, "character_gen", 27)
 
     # ── Stage 3: Text overlay PNGs (32%) ────────────────────────────────────
@@ -128,6 +139,8 @@ async def _run_pipeline_inner(project_id: str, spec: dict) -> None:
             None, generate_scene, scene["visual_action"], sp, _poll_cb
         )
         scene_paths.append(sp)
+        log_api_cost(project_id, "veo", model_config.VEO_MODEL, stage_key,
+                     8.0, "seconds", est_veo31(8.0))
         await _emit_done(project_id, stage_key, scene_pct_end)
 
     # ── Stage 5: Voiceover (82%) ─────────────────────────────────────────────
@@ -136,6 +149,8 @@ async def _run_pipeline_inner(project_id: str, spec: dict) -> None:
     vo_script = "\n\n".join(s.get("vo_text", "") for s in scenes if s.get("vo_text"))
     vo_path = voiceover_path(project_id)
     await loop.run_in_executor(None, generate_voiceover, vo_script, vo_path)
+    log_api_cost(project_id, "elevenlabs", "eleven_turbo_v2_5", "voiceover",
+                 len(vo_script), "characters", est_elevenlabs(vo_script))
     await _emit_done(project_id, "voiceover", 82)
 
     # ── Stage 6: Stitch scenes (88%) ─────────────────────────────────────────

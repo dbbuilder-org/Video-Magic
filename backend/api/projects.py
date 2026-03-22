@@ -3,7 +3,7 @@ from fastapi import APIRouter, BackgroundTasks, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from models import get_project, get_jobs, list_projects_by_user, patch_project_spec, update_project
+from models import get_project, get_jobs, get_project_costs, list_projects_by_user, patch_project_spec, update_project
 from progress import subscribe
 from api.generate import run_pipeline
 
@@ -66,6 +66,33 @@ async def update_spec(
 
     bg.add_task(run_pipeline, project_id, merged_spec)
     return {"project_id": project_id, "status": "rerunning"}
+
+
+@router.get("/{project_id}/cost-breakdown")
+async def cost_breakdown(project_id: str, x_user_id: str | None = Header(None)):
+    p = get_project(project_id)
+    if not p:
+        raise HTTPException(404, "Project not found")
+    _check_ownership(p, x_user_id)
+    costs = get_project_costs(project_id)
+    total = round(sum(c["cost_usd"] for c in costs), 4)
+    return {"project_id": project_id, "total_usd": total, "breakdown": costs}
+
+
+@router.post("/{project_id}/reprocess")
+async def reprocess(
+    project_id: str,
+    bg: BackgroundTasks,
+    x_user_id: str | None = Header(None),
+):
+    """Re-run stitch/overlay/mix with cached scene files (skips expensive Veo/VO re-generation)."""
+    p = get_project(project_id)
+    if not p:
+        raise HTTPException(404, "Project not found")
+    _check_ownership(p, x_user_id)
+    update_project(project_id, status="running", error=None, video_url=None)
+    bg.add_task(run_pipeline, project_id, p["spec"])
+    return {"project_id": project_id, "status": "reprocessing"}
 
 
 @router.get("/{project_id}/progress")
