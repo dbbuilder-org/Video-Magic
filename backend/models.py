@@ -98,6 +98,23 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def reset_orphaned_projects() -> int:
+    """Mark any project stuck in 'running' as 'error' at startup (crash recovery).
+
+    Returns the number of projects reset.
+    """
+    now = _now()
+    conn = _connect()
+    cur = conn.execute(
+        "UPDATE projects SET status = ?, error = ?, updated_at = ? WHERE status = ?",
+        ("error", "Pipeline interrupted by server restart. Use Reprocess to retry.", now, "running"),
+    )
+    count = cur.rowcount
+    conn.commit()
+    conn.close()
+    return count
+
+
 # ── Project CRUD ─────────────────────────────────────────────────────────────
 
 def create_project(spec: dict, user_id: str | None = None) -> dict:

@@ -220,3 +220,26 @@ def test_api_costs_isolated_per_project():
 def test_api_costs_empty_for_new_project():
     p = models.create_project({})
     assert models.get_project_costs(p["id"]) == []
+
+
+# ── Orphan Recovery ───────────────────────────────────────────────────────────
+
+def test_reset_orphaned_projects_marks_running_as_error():
+    p1 = models.create_project({})
+    p2 = models.create_project({})
+    models.update_project(p1["id"], status="running")
+    models.update_project(p2["id"], status="done")
+
+    count = models.reset_orphaned_projects()
+
+    assert count == 1
+    assert models.get_project(p1["id"])["status"] == "error"
+    assert "interrupted" in models.get_project(p1["id"])["error"].lower()
+    assert models.get_project(p2["id"])["status"] == "done"
+
+
+def test_reset_orphaned_projects_none_running():
+    p = models.create_project({})
+    models.update_project(p["id"], status="pending")
+    count = models.reset_orphaned_projects()
+    assert count == 0

@@ -46,6 +46,8 @@ function ProjectPageInner() {
         if (p.status === "done" && p.video_url) {
           setVideoUrl(p.video_url);
           setTab("editor");
+        } else if (p.status === "error" && p.error) {
+          setErrorMsg(p.error);
         }
       } catch (e: unknown) {
         setErrorMsg(e instanceof Error ? e.message : "Failed to load project");
@@ -117,10 +119,10 @@ function ProjectPageInner() {
           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
             isDone ? "bg-green-900/40 text-green-400 border border-green-500/30" :
             isProcessing ? "bg-brand-cyan/20 text-brand-cyan border border-brand-cyan/30" :
-            errorMsg ? "bg-red-900/40 text-red-400 border border-red-500/30" :
+            (errorMsg || project?.status === "error") ? "bg-red-900/40 text-red-400 border border-red-500/30" :
             "bg-white/10 text-slate-400"
           }`}>
-            {isDone ? "Done" : isProcessing ? "Processing…" : errorMsg ? "Error" : project?.status || "Pending"}
+            {isDone ? "Done" : isProcessing ? "Processing…" : (errorMsg || project?.status === "error") ? "Error" : project?.status || "Pending"}
           </span>
           <span className="text-slate-500 font-mono text-xs">{projectId?.slice(0, 8)}</span>
         </div>
@@ -195,8 +197,15 @@ function ProjectPageInner() {
                 </button>
               </div>
             ) : (
-              <div className="text-center py-16 text-slate-500">
-                Waiting for pipeline to start…
+              <div className="text-center py-16">
+                <p className="text-slate-500 mb-6">
+                  {project?.status === "error" ? "Pipeline failed." : "Waiting for pipeline to start…"}
+                </p>
+                {(project?.status === "error" || project?.status === "pending") && (
+                  <button onClick={handleReprocess} className="px-6 py-3 bg-brand-blue hover:bg-brand-cyan text-white rounded-xl font-medium transition-colors">
+                    Reprocess Video →
+                  </button>
+                )}
               </div>
             )}
           </div>

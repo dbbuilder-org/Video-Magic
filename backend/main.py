@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from models import create_tables
+from models import create_tables, reset_orphaned_projects
 from model_config import resolve_models, _resolved
 from api.projects import router as projects_router
 from api.stripe_routes import router as stripe_router
@@ -41,6 +41,7 @@ app.mount("/storage", StaticFiles(directory=str(STORAGE_DIR)), name="storage")
 @app.on_event("startup")
 async def startup():
     create_tables()
+    reset_orphaned_projects()
     resolve_models()
 
 
