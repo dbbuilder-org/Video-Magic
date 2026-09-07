@@ -29,3 +29,6 @@ storage/projects/*/character.png
 
 # macOS
 .DS_Store
+
+# Build artifacts
+*.tsbuildinfo
