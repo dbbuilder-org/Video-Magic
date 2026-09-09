@@ -23,6 +23,10 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: BACKEND_PROXY_SECRET
+        generateValue: true    # shared with the frontend below via fromService.
+                               # The API trusts X-User-Id only when this matches,
+                               # and refuses every guarded route if it is unset.
       - key: STRIPE_PRICE_10S
         sync: false
       - key: STRIPE_PRICE_30S
@@ -67,6 +71,11 @@ services:
         sync: false           # set in Render dashboard to https://<video-magic-api>.onrender.com
       - key: NEXT_PUBLIC_BACKEND_URL
         sync: false           # same value as BACKEND_URL
+      - key: BACKEND_PROXY_SECRET
+        fromService:
+          name: video-magic-api
+          type: web
+          envVarKey: BACKEND_PROXY_SECRET
       - key: NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
         sync: false
       - key: CLERK_SECRET_KEY

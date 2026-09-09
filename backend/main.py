@@ -14,8 +14,16 @@ from model_config import resolve_models, _resolved
 from api.projects import router as projects_router
 from api.stripe_routes import router as stripe_router
 from api.users import router as users_router
+from api.proxy_guard import require_proxy_secret
 
 app = FastAPI(title="Video Magic API", version="1.0.0")
+
+# Proxy gate. Registered before CORS so that CORS remains the outermost
+# middleware and preflight requests are still answered. This service is
+# deployed as its own public web service (see render.yaml), so without this
+# gate the X-User-Id and X-User-Email headers are self-asserted by whoever
+# calls it.
+app.middleware("http")(require_proxy_secret)
 
 # CORS — allow Next.js dev server + production
 origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")]

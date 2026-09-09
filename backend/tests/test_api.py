@@ -25,7 +25,11 @@ def client():
             return_value=httpx.Response(200, json=FAKE_MODELS)
         )
         from main import app
-        with TestClient(app) as c:
+        # Every request carries the proxy secret by default: the API is only
+        # reachable through the authenticated Next.js proxy in production, so
+        # that is the shape the tests should exercise. See test_proxy_gate.py
+        # for the gate's own behaviour.
+        with TestClient(app, headers={"X-Proxy-Secret": "test-proxy-secret"}) as c:
             yield c
 
 

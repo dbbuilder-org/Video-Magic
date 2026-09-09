@@ -21,7 +21,13 @@ npm run lint         # eslint
 stripe listen --forward-to localhost:8000/stripe/webhook
 ```
 
-No test suite exists — manual browser testing only.
+```bash
+# Backend tests
+cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-test.txt
+.venv/bin/python -m pytest tests/ -q      # 97 tests
+```
+
+The frontend has no test suite — manual browser testing only.
 
 ## Architecture
 
@@ -31,9 +37,24 @@ backend/    FastAPI (Python) + SQLite (no ORM) + SSE progress bus
 storage/    projects/<id>/{scenes/,overlays/,final.mp4} — gitignored
 ```
 
-**API proxy**: Next.js rewrites `/api/backend/*` → `BACKEND_URL/*` (configured in `next.config.ts`). Next.js API routes at `frontend/app/api/` handle auth before proxying — they extract the Clerk `userId` and forward it as `X-User-Id: <id>` header.
+**API proxy**: `/api/backend/*` is served by `frontend/app/api/backend/[...path]/route.ts`, an
+authenticated proxy. It resolves the Clerk session server-side, sets `X-User-Id` from it, **drops any
+client-supplied `X-User-*` header**, and attaches `X-Proxy-Secret`. There is deliberately **no
+rewrite** in `next.config.ts` — see the comment there before adding one back.
 
-**Auth model**: Backend trusts `X-User-Id` header (set by Next.js middleware); it never calls Clerk directly. All sensitive backend routes check this header for ownership.
+**Auth model**: the backend still derives identity from `X-User-Id` and never calls Clerk. That is
+only sound because `api/proxy_guard.py` rejects any guarded request whose `X-Proxy-Secret` does not
+match `BACKEND_PROXY_SECRET`, so the header can only have been set by the proxy. Both sides **fail
+closed** when the variable is unset (proxy 503, backend 503). Public paths: `/health`,
+`/stripe/webhook`, `/storage`, and the docs routes.
+
+> **Why it is built this way.** The backend is deployed as its own public web service (`render.yaml`),
+> so before the gate existed anyone could call it directly with a chosen `X-User-Id` and read or
+> modify another user's profile, credits, referral code and projects — `_require_owner` compares the
+> header against the user id in the path, and a direct caller controls both. A chosen
+> `X-User-Email` on `stripe/free-checkout` also granted free generation, since entitlement is
+> decided by email domain (`FREE_DOMAINS`). Keep both halves: the proxy is what makes the header
+> true, and the gate is what makes the proxy unavoidable.
 
 **Database**: SQLite with WAL mode, raw parameterized SQL in `backend/models.py`. Tables: `projects`, `jobs`, `user_profiles`, `referral_codes`, `referrals`, `user_credits`.
 
@@ -76,7 +97,9 @@ Veo 3.1 prompts must contain **zero readable words**. All on-screen text is rend
 | `backend/pipeline/text_overlay.py` | Pillow text PNGs + ffmpeg composite |
 | `backend/pipeline/voiceover.py` | ElevenLabs SDK v2 MP3 generation |
 | `backend/pipeline/assembler.py` | ffmpeg stitch + audio duck/mix |
+| `frontend/app/api/backend/[...path]/route.ts` | Authenticated catch-all proxy; sets identity from the Clerk session |
 | `frontend/app/api/checkout/route.ts` | Auth'd proxy: POST checkout → backend |
+| `backend/api/proxy_guard.py` | Shared-secret gate; fails closed when unset |
 | `frontend/app/api/progress/[id]/route.ts` | SSE proxy to backend (duplex: "half") |
 | `frontend/middleware.ts` | Clerk auth; public routes: `/`, `/sign-in`, `/sign-up`, `/api/webhook` |
 
@@ -102,11 +125,13 @@ Veo 3.1 prompts must contain **zero readable words**. All on-screen text is rend
 | `APP_URL` | Frontend URL for Stripe redirects |
 | `DATABASE_PATH` | SQLite path (default: `./video_magic.db`) |
 | `STORAGE_DIR` | Video output dir (default: `./storage/projects`) |
+| `BACKEND_PROXY_SECRET` | **Required.** Shared with the frontend; unset = all guarded routes 503 |
 
 **Frontend** (`.env.local`):
 - `BACKEND_URL` — FastAPI URL (e.g., `http://localhost:8000`)
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
 - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
+- `BACKEND_PROXY_SECRET` — **required**; must match the backend's. Unset = the proxy 503s
 
 ## Deployment
 
